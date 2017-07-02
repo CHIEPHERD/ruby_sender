@@ -3,6 +3,7 @@ require 'json'
 require 'pp'
 require 'thread'
 require_relative 'publisher'
+require 'yaml'
 
 class RPC
   attr_accessor :response, :call_id
@@ -18,7 +19,7 @@ class RPC
 
     @reply_queue = @channel.queue('', exclusive: true)
     puts "RPQ " + @reply_queue.name
-    @routing_key = 'chiepherd.task.list'
+    @routing_key = 'user.projects'
 
     that = self
     @reply_queue.subscribe do |delivery_info, properties, payload|
@@ -30,12 +31,11 @@ class RPC
     end
   end
 
-  def call(msg)
-    self.call_id = generate_uuid
-
-    @exchange.publish(msg, routing_key: @routing_key,
-                           correlation_id: self.call_id,
-                           reply_to: @reply_queue.name)
+  def call
+    msg = YAML.load_file "messages/#{@routing_key.sub('.', '/')}.yml"
+    @exchange.publish(msg.to_json, routing_key: "chiepherd.#{@routing_key}",
+                                correlation_id: self.call_id,
+                                reply_to: @reply_queue.name)
     @lock.synchronize{@condition.wait(@lock)}
     response
   end
@@ -43,15 +43,8 @@ class RPC
   protected
 
   def generate_uuid
-    # very naive but good enough for code
-    # examples
     "#{rand}#{rand}#{rand}"
   end
 end
 
-
-msg = {
-  uuid: '24e18762-671e-46dd-9f8e-2f9d5186a921',
-  projectId: 1
-}.to_json
-pp RPC.new.call(msg)
+pp RPC.new.call
