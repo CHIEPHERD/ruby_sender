@@ -19,7 +19,7 @@ class RPC
 
     @reply_queue = @channel.queue('', exclusive: true)
     puts "RPQ " + @reply_queue.name
-    @routing_key = 'user.projects'
+    @routing_key = 'kanban.project.states'
 
     that = self
     @reply_queue.subscribe do |delivery_info, properties, payload|
@@ -32,8 +32,8 @@ class RPC
   end
 
   def call
-    msg = YAML.load_file "messages/#{@routing_key.sub('.', '/')}.yml"
-    @exchange.publish(msg.to_json, routing_key: "chiepherd.#{@routing_key}",
+    msg = YAML.load_file "messages/#{@routing_key.gsub('.', '/')}.yml"
+    @exchange.publish(msg.to_json, routing_key: @routing_key,
                                 correlation_id: self.call_id,
                                 reply_to: @reply_queue.name)
     @lock.synchronize{@condition.wait(@lock)}
