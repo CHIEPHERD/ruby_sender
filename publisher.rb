@@ -22,4 +22,8 @@ class Publisher
   def connection
     @conn
   end
+
+  def close
+    @conn.close
+  end
 end

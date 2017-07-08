@@ -19,7 +19,7 @@ class RPC
 
     @reply_queue = @channel.queue('', exclusive: true)
     puts "RPQ " + @reply_queue.name
-    @routing_key = 'kanban.project.states'
+    @routing_key = 'kanban.task.change_points'
 
     that = self
     @reply_queue.subscribe do |delivery_info, properties, payload|
@@ -31,6 +31,10 @@ class RPC
     end
   end
 
+  def close
+    @publisher.close
+  end
+
   def call
     msg = YAML.load_file "messages/#{@routing_key.gsub('.', '/')}.yml"
     @exchange.publish(msg.to_json, routing_key: @routing_key,
@@ -38,6 +42,8 @@ class RPC
                                 reply_to: @reply_queue.name)
     @lock.synchronize{@condition.wait(@lock)}
     response
+  rescue
+    @reply_queue.close
   end
 
   protected
@@ -47,4 +53,12 @@ class RPC
   end
 end
 
-pp RPC.new.call
+
+begin
+  conn = RPC.new
+  pp conn.call
+rescue Interrupt
+ensure
+  puts 'Shutdown'
+  conn.close
+end
